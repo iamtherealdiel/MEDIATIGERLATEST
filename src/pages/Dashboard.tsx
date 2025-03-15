@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
+import React, { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../lib/supabase";
 import {
   LogOut,
   Settings,
@@ -19,24 +19,28 @@ import {
   Calendar,
   Clock,
   UserX,
-  ArrowLeft
-} from 'lucide-react';
-import toast from 'react-hot-toast';
-import OnboardingPopup from '../components/OnboardingPopup';
+  ArrowLeft,
+} from "lucide-react";
+import toast from "react-hot-toast";
+import OnboardingPopup from "../components/OnboardingPopup";
 
 // Utility to prevent duplicate toasts
 const shownToasts = new Set<string>();
-const showUniqueToast = (message: string, type: 'success' | 'error', id?: string) => {
+const showUniqueToast = (
+  message: string,
+  type: "success" | "error",
+  id?: string
+) => {
   const toastId = id || message;
   if (!shownToasts.has(toastId)) {
     shownToasts.add(toastId);
-    
-    if (type === 'success') {
+
+    if (type === "success") {
       toast.success(message, { id: toastId });
     } else {
       toast.error(message, { id: toastId });
     }
-    
+
     // Remove from tracking after some time
     setTimeout(() => {
       shownToasts.delete(toastId);
@@ -49,7 +53,10 @@ export default function Dashboard() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [applicationStatus, setApplicationStatus] = useState<string | null>(
+    null
+  );
   const [hasRequest, setHasRequest] = useState<boolean>(false);
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -59,11 +66,13 @@ export default function Dashboard() {
     try {
       await signOut();
     } catch (error) {
-      console.error('Error signing out:', error);
-      showUniqueToast('Failed to sign out', 'error', 'signout-error');
+      console.error("Error signing out:", error);
+      showUniqueToast("Failed to sign out", "error", "signout-error");
+    } finally {
+      setIsLoading(false);
     }
   };
-  
+
   useEffect(() => {
     // Force show onboarding if not completed
     if (user && !user.user_metadata?.onboarding_complete) {
@@ -75,13 +84,13 @@ export default function Dashboard() {
   useEffect(() => {
     const checkStatus = async () => {
       if (!user) return;
-      
+
       try {
         // First check if user has any requests
         const { data: requests, error: countError } = await supabase
-          .from('user_requests')
-          .select('id')
-          .eq('user_id', user.id)
+          .from("user_requests")
+          .select("id")
+          .eq("user_id", user.id)
           .maybeSingle();
 
         if (countError) throw countError;
@@ -91,44 +100,44 @@ export default function Dashboard() {
         // Only fetch status if user has a request
         if (requests) {
           const { data, error } = await supabase
-            .from('user_requests')
-            .select('status')
-            .eq('user_id', user.id)
+            .from("user_requests")
+            .select("status")
+            .eq("user_id", user.id)
             .single();
 
           if (error) throw error;
-        
+
           setApplicationStatus(data?.status || null);
-          
+
           // If rejected, get the rejection reason
-          if (data?.status === 'rejected') {
+          if (data?.status === "rejected") {
             const { data: accessData } = await supabase
-              .from('admin_access')
-              .select('access_reason')
-              .eq('accessed_user_id', user.id)
-              .order('accessed_at', { ascending: false })
+              .from("admin_access")
+              .select("access_reason")
+              .eq("accessed_user_id", user.id)
+              .order("accessed_at", { ascending: false })
               .limit(1)
               .single();
-            
+
             setRejectionReason(accessData?.access_reason || null);
           }
-        
+
           // If application is approved, show success message and stop checking
-          if (data?.status === 'approved') {
-            toast.success('Your application has been approved!', {
+          if (data?.status === "approved") {
+            toast.success("Your application has been approved!", {
               duration: 5000,
-              icon: '🎉'
+              icon: "🎉",
             });
-          } else if (data?.status === 'rejected') {
-            toast.error('Your application has been rejected.', {
-              duration: 5000
+          } else if (data?.status === "rejected") {
+            toast.error("Your application has been rejected.", {
+              duration: 5000,
             });
             // Redirect to home page if rejected
-            navigate('/');
+            navigate("/");
           }
         }
       } catch (error) {
-        console.error('Error checking application status:', error);
+        console.error("Error checking application status:", error);
       }
     };
 
@@ -141,36 +150,49 @@ export default function Dashboard() {
 
   // Redirect to home if no request or rejected
   useEffect(() => {
-    if (hasRequest && applicationStatus === 'rejected') {
-      navigate('/');
+    if (hasRequest && applicationStatus === "rejected") {
+      navigate("/");
     }
   }, [hasRequest, applicationStatus, navigate]);
-
+  if (isLoading && !applicationStatus) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-2"></div>
+          <span className="text-white text-sm">Loading...</span>
+        </div>
+      </div>
+    );
+  }
   // Show loading state while checking application
-  if (hasRequest && applicationStatus === 'pending') {
+  if (hasRequest && applicationStatus === "pending") {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
         {/* Background effects */}
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-indigo-500/10 animate-pulse"></div>
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-500/5 rounded-full blur-3xl"></div>
-        
+
         <div className="max-w-2xl w-full bg-slate-800/90 backdrop-blur-sm p-12 rounded-2xl shadow-2xl text-center relative">
           {/* Animated loading spinner */}
           <div className="relative w-24 h-24 mx-auto mb-8">
             <div className="absolute inset-0 rounded-full border-4 border-indigo-500/20"></div>
             <div className="absolute inset-0 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin"></div>
             <div className="absolute inset-2 rounded-full border-4 border-purple-500/20"></div>
-            <div className="absolute inset-2 rounded-full border-4 border-purple-500 border-t-transparent animate-spin" style={{ animationDuration: '2s' }}></div>
+            <div
+              className="absolute inset-2 rounded-full border-4 border-purple-500 border-t-transparent animate-spin"
+              style={{ animationDuration: "2s" }}
+            ></div>
           </div>
-          
+
           <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-400 mb-6">
             Application Pending
           </h2>
-          
+
           <p className="text-xl text-slate-300 mb-8 leading-relaxed max-w-xl mx-auto">
-            Your application is currently under review by our team. You'll be automatically redirected to your dashboard once it's approved.
+            Your application is currently under review by our team. You'll be
+            automatically redirected to your dashboard once it's approved.
           </p>
-          
+
           <button
             onClick={handleSignOut}
             className="inline-flex items-center px-6 py-3 text-base font-medium text-white bg-red-600/90 hover:bg-red-700 rounded-lg transition-colors mb-8 group"
@@ -178,7 +200,7 @@ export default function Dashboard() {
             <LogOut className="h-5 w-5 mr-2 transition-transform group-hover:-translate-x-1" />
             Sign Out
           </button>
-          
+
           <div className="flex items-center justify-center space-x-2 text-slate-400">
             <div className="w-2 h-2 rounded-full bg-indigo-500 animate-[moveRight_1.5s_ease-in-out_infinite]"></div>
             <div className="w-2 h-2 rounded-full bg-purple-500 animate-[moveRight_1.5s_ease-in-out_0.2s_infinite]"></div>
@@ -190,37 +212,40 @@ export default function Dashboard() {
   }
 
   // Show rejection page
-  if (hasRequest && applicationStatus === 'rejected') {
+  if (hasRequest && applicationStatus === "rejected") {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
         {/* Background effects */}
         <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 via-slate-500/10 to-red-500/10 animate-pulse"></div>
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-red-500/5 rounded-full blur-3xl"></div>
-        
+
         <div className="max-w-2xl w-full bg-slate-800/90 backdrop-blur-sm p-12 rounded-2xl shadow-2xl text-center relative">
           <div className="w-24 h-24 mx-auto mb-8 rounded-full bg-red-500/20 flex items-center justify-center">
             <UserX className="h-12 w-12 text-red-400" />
           </div>
-          
+
           <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-red-300 mb-6">
             Application Rejected
           </h2>
-          
+
           <p className="text-xl text-slate-300 mb-8 leading-relaxed max-w-xl mx-auto">
             We're sorry, but your application has been rejected.
           </p>
-          
+
           {rejectionReason && (
             <div className="bg-slate-700/50 p-6 rounded-lg mb-8 text-left">
-              <h3 className="text-lg font-semibold text-white mb-2">Reason for Rejection:</h3>
+              <h3 className="text-lg font-semibold text-white mb-2">
+                Reason for Rejection:
+              </h3>
               <p className="text-slate-300">{rejectionReason}</p>
             </div>
           )}
-          
+
           <p className="text-slate-400 mb-8">
-            You can try submitting a new application after addressing the feedback provided.
+            You can try submitting a new application after addressing the
+            feedback provided.
           </p>
-          
+
           <div className="flex flex-col md:flex-row items-center justify-center gap-4">
             <button
               onClick={handleSignOut}
@@ -229,7 +254,7 @@ export default function Dashboard() {
               <LogOut className="h-5 w-5 mr-2 transition-transform group-hover:-translate-x-1" />
               Sign Out
             </button>
-            
+
             <Link
               to="/"
               className="inline-flex items-center px-6 py-3 text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors order-1 md:order-2"
@@ -237,7 +262,7 @@ export default function Dashboard() {
               <ArrowLeft className="h-5 w-5 mr-2" />
               Back to Home
             </Link>
-            
+
             <button
               onClick={() => {
                 // Reset user metadata and redirect to onboarding
@@ -255,71 +280,80 @@ export default function Dashboard() {
 
   const navigationItems = [
     {
-      name: 'Analytics',
+      name: "Analytics",
       icon: <BarChart3 className="h-5 w-5" />,
-      href: '/features/analytics',
-      count: '12'
+      href: "/features/analytics",
+      count: "12",
     },
     {
-      name: 'Channel Management',
+      name: "Channel Management",
       icon: <Play className="h-5 w-5" />,
-      href: '/features/channel-management'
+      href: "/features/channel-management",
     },
     {
-      name: 'Digital Rights',
+      name: "Digital Rights",
       icon: <Shield className="h-5 w-5" />,
-      href: '/features/digital-rights'
+      href: "/features/digital-rights",
     },
     {
-      name: 'Global Distribution',
+      name: "Global Distribution",
       icon: <Globe className="h-5 w-5" />,
-      href: '/features/global-distribution'
-    }
+      href: "/features/global-distribution",
+    },
   ];
 
   const userStats = {
     joinDate: new Date(user?.created_at || Date.now()).toLocaleDateString(),
-    lastLogin: new Date(user?.last_sign_in_at || Date.now()).toLocaleDateString(),
-    accountType: 'Pro User',
-    contentCount: 156
+    lastLogin: new Date(
+      user?.last_sign_in_at || Date.now()
+    ).toLocaleDateString(),
+    accountType: "Pro User",
+    contentCount: 156,
   };
 
   return (
     <div className="min-h-screen bg-slate-900">
       {/* Onboarding Popup */}
       {showOnboarding && user && (
-        <OnboardingPopup 
-          isOpen={showOnboarding} 
+        <OnboardingPopup
+          isOpen={showOnboarding}
           onClose={() => setShowOnboarding(false)}
           userId={user.id}
-          userEmail={user.email || ''}
+          userEmail={user.email || ""}
         />
       )}
-      
+
       {/* Sidebar for desktop */}
       <div className="hidden md:fixed md:inset-y-0 md:flex md:w-64 md:flex-col">
         <div className="flex min-h-0 flex-1 flex-col bg-slate-800">
           <div className="flex flex-1 flex-col overflow-y-auto pt-5 pb-4">
             <div className="flex flex-shrink-0 items-center px-4">
-              <img 
-                src="https://dlveiezovfooqbbfzfmo.supabase.co/storage/v1/object/public/Images//mtiger.png" 
-                alt="MediaTiger Logo" 
+              <img
+                src="https://dlveiezovfooqbbfzfmo.supabase.co/storage/v1/object/public/Images//mtiger.png"
+                alt="MediaTiger Logo"
                 className="h-8 w-8"
               />
-              <span className="ml-2 text-xl font-bold text-white">MediaTiger</span>
+              <span className="ml-2 text-xl font-bold text-white">
+                MediaTiger
+              </span>
             </div>
 
             {/* User Profile Summary */}
             <div className="px-4 py-6 text-center">
               <div className="relative inline-block">
                 <div className="h-24 w-24 rounded-full bg-indigo-600 mx-auto mb-4 flex items-center justify-center text-white text-3xl font-bold">
-                  {user?.user_metadata?.full_name?.[0]?.toUpperCase() || <UserCircle className="h-16 w-16" />}
+                  {user?.user_metadata?.full_name?.[0]?.toUpperCase() || (
+                    <UserCircle className="h-16 w-16" />
+                  )}
                 </div>
               </div>
               <h2 className="text-xl font-bold text-white mb-1">
-                Welcome, {user?.user_metadata?.full_name?.split(' ')[0] || 'User'}!
+                Welcome,{" "}
+                {user?.user_metadata?.full_name?.split(" ")[0] || "User"}!
               </h2>
-              <p className="text-sm text-slate-400 mb-4">{userStats.accountType}</p>
+              <p className="text-sm text-slate-400 mb-4">
+                {userStats.accountType}
+              </p>
               <div className="flex justify-center space-x-2">
                 <Link
                   to="/profile"
@@ -362,21 +396,21 @@ export default function Dashboard() {
         <div className="fixed inset-0 z-40 flex">
           <div
             className={`fixed inset-0 bg-slate-600 bg-opacity-75 transition-opacity ease-in-out duration-300 ${
-              isMobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+              isMobileMenuOpen ? "opacity-100" : "opacity-0 pointer-events-none"
             }`}
             onClick={() => setIsMobileMenuOpen(false)}
           />
 
           <div
             className={`relative flex w-full max-w-xs flex-1 flex-col bg-slate-800 pt-5 pb-4 transform transition ease-in-out duration-300 ${
-              isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+              isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
             }`}
           >
             <div className="absolute top-1 right-0 -mr-14 p-1">
               <button
                 type="button"
                 className={`h-12 w-12 rounded-full flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white ${
-                  isMobileMenuOpen ? '' : 'hidden'
+                  isMobileMenuOpen ? "" : "hidden"
                 }`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
@@ -385,23 +419,30 @@ export default function Dashboard() {
             </div>
 
             <div className="flex-shrink-0 flex items-center px-4">
-              <img 
-                src="https://dlveiezovfooqbbfzfmo.supabase.co/storage/v1/object/public/Images//mtiger.png" 
-                alt="MediaTiger Logo" 
+              <img
+                src="https://dlveiezovfooqbbfzfmo.supabase.co/storage/v1/object/public/Images//mtiger.png"
+                alt="MediaTiger Logo"
                 className="h-8 w-8"
               />
-              <span className="ml-2 text-xl font-bold text-white">MediaTiger</span>
+              <span className="ml-2 text-xl font-bold text-white">
+                MediaTiger
+              </span>
             </div>
 
             {/* Mobile User Profile Summary */}
             <div className="px-4 py-6 text-center">
               <div className="h-20 w-20 rounded-full bg-indigo-600 mx-auto mb-4 flex items-center justify-center text-white text-2xl font-bold">
-                {user?.user_metadata?.full_name?.[0]?.toUpperCase() || <UserCircle className="h-12 w-12" />}
+                {user?.user_metadata?.full_name?.[0]?.toUpperCase() || (
+                  <UserCircle className="h-12 w-12" />
+                )}
               </div>
               <h2 className="text-lg font-bold text-white mb-1">
-                Welcome, {user?.user_metadata?.full_name?.split(' ')[0] || 'User'}!
+                Welcome,{" "}
+                {user?.user_metadata?.full_name?.split(" ")[0] || "User"}!
               </h2>
-              <p className="text-sm text-slate-400 mb-4">{userStats.accountType}</p>
+              <p className="text-sm text-slate-400 mb-4">
+                {userStats.accountType}
+              </p>
             </div>
 
             <div className="mt-5 flex-1 h-0 overflow-y-auto">
@@ -480,28 +521,36 @@ export default function Dashboard() {
                     <Mail className="h-5 w-5 text-indigo-400" />
                     <div>
                       <p className="text-sm text-slate-400">Email</p>
-                      <p className="text-sm font-medium text-white">{user?.email}</p>
+                      <p className="text-sm font-medium text-white">
+                        {user?.email}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3 p-3 bg-slate-700 rounded-lg">
                     <Calendar className="h-5 w-5 text-indigo-400" />
                     <div>
                       <p className="text-sm text-slate-400">Joined</p>
-                      <p className="text-sm font-medium text-white">{userStats.joinDate}</p>
+                      <p className="text-sm font-medium text-white">
+                        {userStats.joinDate}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3 p-3 bg-slate-700 rounded-lg">
                     <Clock className="h-5 w-5 text-indigo-400" />
                     <div>
                       <p className="text-sm text-slate-400">Last Login</p>
-                      <p className="text-sm font-medium text-white">{userStats.lastLogin}</p>
+                      <p className="text-sm font-medium text-white">
+                        {userStats.lastLogin}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3 p-3 bg-slate-700 rounded-lg">
                     <Play className="h-5 w-5 text-indigo-400" />
                     <div>
                       <p className="text-sm text-slate-400">Content Items</p>
-                      <p className="text-sm font-medium text-white">{userStats.contentCount}</p>
+                      <p className="text-sm font-medium text-white">
+                        {userStats.contentCount}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -516,8 +565,12 @@ export default function Dashboard() {
                         <BarChart3 className="h-8 w-8 text-indigo-500" />
                       </div>
                       <div className="ml-4">
-                        <p className="text-sm font-medium text-slate-400">Total Views</p>
-                        <p className="text-2xl font-semibold text-white">2.6M</p>
+                        <p className="text-sm font-medium text-slate-400">
+                          Total Views
+                        </p>
+                        <p className="text-2xl font-semibold text-white">
+                          2.6M
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -529,7 +582,9 @@ export default function Dashboard() {
                         <Play className="h-8 w-8 text-green-500" />
                       </div>
                       <div className="ml-4">
-                        <p className="text-sm font-medium text-slate-400">Active Channels</p>
+                        <p className="text-sm font-medium text-slate-400">
+                          Active Channels
+                        </p>
                         <p className="text-2xl font-semibold text-white">12</p>
                       </div>
                     </div>
@@ -542,7 +597,9 @@ export default function Dashboard() {
                         <Shield className="h-8 w-8 text-yellow-500" />
                       </div>
                       <div className="ml-4">
-                        <p className="text-sm font-medium text-slate-400">Protected Assets</p>
+                        <p className="text-sm font-medium text-slate-400">
+                          Protected Assets
+                        </p>
                         <p className="text-2xl font-semibold text-white">847</p>
                       </div>
                     </div>
@@ -555,7 +612,9 @@ export default function Dashboard() {
                         <Globe className="h-8 w-8 text-purple-500" />
                       </div>
                       <div className="ml-4">
-                        <p className="text-sm font-medium text-slate-400">Global Reach</p>
+                        <p className="text-sm font-medium text-slate-400">
+                          Global Reach
+                        </p>
                         <p className="text-2xl font-semibold text-white">50+</p>
                       </div>
                     </div>
@@ -564,7 +623,9 @@ export default function Dashboard() {
 
                 {/* Recent Activity */}
                 <div className="mt-8">
-                  <h2 className="text-lg font-medium text-white mb-4">Recent Activity</h2>
+                  <h2 className="text-lg font-medium text-white mb-4">
+                    Recent Activity
+                  </h2>
                   <div className="bg-slate-800 rounded-lg shadow-lg overflow-hidden">
                     <div className="divide-y divide-slate-700">
                       {[1, 2, 3, 4, 5].map((item) => (
@@ -583,7 +644,9 @@ export default function Dashboard() {
                                 </p>
                               </div>
                             </div>
-                            <span className="text-xs text-slate-400">2h ago</span>
+                            <span className="text-xs text-slate-400">
+                              2h ago
+                            </span>
                           </div>
                         </div>
                       ))}
