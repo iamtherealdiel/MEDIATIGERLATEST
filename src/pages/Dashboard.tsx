@@ -154,7 +154,7 @@ export default function Dashboard() {
       navigate("/");
     }
   }, [hasRequest, applicationStatus, navigate]);
-  if (isLoading && !applicationStatus) {
+  if (isLoading && !applicationStatus && !showOnboarding) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="flex flex-col items-center">
